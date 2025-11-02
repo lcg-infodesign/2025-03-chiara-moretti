@@ -65,14 +65,14 @@ function setup() {
   // Calcola la posizione Y dinamicamente in base all'altezza delle legende
   let types = getUniqueTypes();
   
-  // Altezza della legenda dell'elevazione (inizia a Y=60, finisce circa a Y=140)
-  let elevationLegendHeight = 140;
+  // Altezza della legenda dell'elevazione (inizia a Y=95, finisce circa a Y=175)
+  let elevationLegendHeight = 175;
   
   // Altezza della legenda dei tipi
   let cols = 5;
   let rows = ceil(types.length / cols);
   let spacing = 20;
-  let typeLegendStartY = 175; // Aumentato per dare più spazio sotto la legenda dell'elevazione
+  let typeLegendStartY = 210; // Posizionata sotto la legenda dell'elevazione con margine aumentato
   let typeLegendPadding = 20;
   let typeLegendHeight = 40 + rows * spacing + typeLegendPadding * 2; // 40 per titolo + righe + padding
   
@@ -174,8 +174,8 @@ function drawTypeLegend() {
   if (types.length === 0) return;
   
   // Calcola la posizione Y basandosi sulla fine della legenda dell'elevazione
-  // La legenda elevazione finisce a circa: 60 - 20 (padding) + 80 (containerHeight) + 20 (valori sotto) = 140
-  let startY = 175; // Posizionata sotto la legenda dell'elevazione con margine aumentato
+  // La legenda elevazione finisce a circa: 95 - 20 (padding) + 80 (containerHeight) + 20 (valori sotto) = 175
+  let startY = 210; // Posizionata sotto la legenda dell'elevazione con margine aumentato
   let spacing = 20;
   let cols = 5; // Numero di colonne
   let itemWidth = 220; // Larghezza approssimativa di ogni elemento (glifo + testo)
@@ -324,7 +324,7 @@ function drawTypeLegend() {
 
 // Funzione per disegnare la legenda
 function drawLegend() {
-  let legendY = 60; // Aumentato per più spazio dal margine alto
+  let legendY = 95; // Spazio per il titolo e le istruzioni con margine aumentato
   let legendWidth = 500;
   let legendHeight = 35;
   let legendX = width / 2 - legendWidth / 2; // Centrata orizzontalmente
@@ -886,6 +886,21 @@ function draw() {
   // Sfondo scuro elegante
   background(15, 15, 20);
   
+  // Titolo professionale in alto
+  textAlign(CENTER);
+  textSize(32);
+  fill(245, 245, 250);
+  noStroke();
+  textStyle(BOLD);
+  text("Dataset: Volcanoes in the World", width / 2, 35);
+  
+  // Sottolineatura elegante sotto il titolo
+  stroke(100, 150, 255, 180);
+  strokeWeight(2);
+  let titleWidth = textWidth("Dataset: Volcanoes in the World");
+  line(width / 2 - titleWidth / 2 - 20, 43, width / 2 + titleWidth / 2 + 20, 43);
+  noStroke();
+  
   // Istruzione per l'interazione
   textAlign(CENTER);
   textSize(11);
@@ -897,7 +912,7 @@ function draw() {
     instructionText = "Filtro attivo: " + selectedType + " | Clicca di nuovo sulla legenda per rimuovere il filtro";
     fill(255, 180, 50); // Colore arancione per indicare il filtro attivo
   }
-  text(instructionText, width / 2, 35);
+  text(instructionText, width / 2, 70);
   
   // Disegna la legenda dell'elevazione in alto
   drawLegend();

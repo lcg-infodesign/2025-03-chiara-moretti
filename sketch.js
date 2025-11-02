@@ -1,5 +1,6 @@
 let table;
 let volcanoes = [];
+let worldMapImg; // Immagine della mappa del mondo
 
 // Dimensioni del riquadro
 let boxWidth = 1200;
@@ -16,14 +17,44 @@ let minLat, maxLat, minLon, maxLon;
 // Vulcano selezionato
 let selectedVolcano = null;
 
+// Variabile per l'evidenziazione delle legende quando si clicca il footer
+let highlightLegends = false;
+let highlightTimer = 0;
+
+// Tipo di vulcano selezionato nella legenda (null = mostra tutti)
+let selectedType = null;
+
 function preload() {
   // Carica il file CSV
   table = loadTable('volcanoes-2025-10-27 - Es.3 - Original Data.csv', 'csv', 'header');
+  
+  // Prova a caricare l'immagine della mappa del mondo
+  // IMPORTANTE: Per usare un'immagine da URL esterno, potrebbe essere necessario:
+  // 1. Scaricare l'immagine e salvarla come 'world-map.png' nella stessa cartella
+  // 2. Oppure usare un server locale (es. python -m http.server) per evitare problemi CORS
+  
+  // Opzione 1: Carica da file locale (consigliato)
+  // Scarica l'immagine da Dreamstime e salvala come 'world-map.png' nella cartella del progetto
+  try {
+    worldMapImg = loadImage('world-map.png');
+  } catch(e) {
+    console.log('Immagine locale non trovata. Usa la mappa disegnata o aggiungi world-map.png');
+    worldMapImg = null;
+  }
+  
+  // Opzione 2: Prova a caricare da URL (potrebbe non funzionare per CORS)
+  // Decommenta queste righe se vuoi provare con un URL diretto:
+  // try {
+  //   worldMapImg = loadImage('URL_DIRETTO_DELL_IMMAGINE');
+  // } catch(e) {
+  //   console.log('Errore nel caricamento dell\'immagine da URL:', e);
+  //   worldMapImg = null;
+  // }
 }
 
 function setup() {
   // Crea una canvas a tema scuro professionale
-  createCanvas(1600, 1200);
+  createCanvas(1600, 1300); // Aumentata l'altezza per più spazio in basso
   // Sfondo scuro elegante
   background(15, 15, 20);
   
@@ -31,11 +62,23 @@ function setup() {
   processData();
   
   // Centra il riquadro orizzontalmente, spostato in basso per le leggende
-  // Calcola la posizione Y dinamicamente in base all'altezza della legenda
+  // Calcola la posizione Y dinamicamente in base all'altezza delle legende
   let types = getUniqueTypes();
-  let legendHeight = 25 + (floor((types.length - 1) / 5) + 1) * 18; // Altezza approssimativa della legenda
+  
+  // Altezza della legenda dell'elevazione (inizia a Y=60, finisce circa a Y=140)
+  let elevationLegendHeight = 140;
+  
+  // Altezza della legenda dei tipi
+  let cols = 5;
+  let rows = ceil(types.length / cols);
+  let spacing = 20;
+  let typeLegendStartY = 175; // Aumentato per dare più spazio sotto la legenda dell'elevazione
+  let typeLegendPadding = 20;
+  let typeLegendHeight = 40 + rows * spacing + typeLegendPadding * 2; // 40 per titolo + righe + padding
+  
+  // Posiziona il riquadro sotto le legende con margine molto ridotto
   boxX = (width - boxWidth) / 2;
-  boxY = 100 + legendHeight + 20; // Spazio per le leggende + margine
+  boxY = typeLegendStartY + typeLegendHeight - 5; // Spazio per tutte le legende - sovrapposizione minima
   
   // Ora che boxX e boxY sono definiti, mappa le coordinate dei vulcani
   mapVolcanoCoordinates();
@@ -130,8 +173,10 @@ function drawTypeLegend() {
   let types = getUniqueTypes();
   if (types.length === 0) return;
   
-  let startY = 90; // Sotto la legenda dell'elevazione
-  let spacing = 18;
+  // Calcola la posizione Y basandosi sulla fine della legenda dell'elevazione
+  // La legenda elevazione finisce a circa: 60 - 20 (padding) + 80 (containerHeight) + 20 (valori sotto) = 140
+  let startY = 175; // Posizionata sotto la legenda dell'elevazione con margine aumentato
+  let spacing = 20;
   let cols = 5; // Numero di colonne
   let itemWidth = 220; // Larghezza approssimativa di ogni elemento (glifo + testo)
   let itemMargin = 15; // Margine tra gli elementi
@@ -151,17 +196,53 @@ function drawTypeLegend() {
     itemWidth = (legendWidth - (cols - 1) * itemMargin) / cols;
   }
   
-  // Titolo - stile professionale
+  // Calcola l'altezza totale necessaria
+  let rows = ceil(types.length / cols);
+  let totalHeight = 40 + rows * spacing;
+  let padding = 20;
+  
+  // Istruzione sopra la legenda
   textAlign(CENTER);
-  textSize(15);
-  fill(240, 240, 245);
+  textSize(10);
+  fill(180, 180, 190);
+  noStroke();
+  textStyle(NORMAL);
+  text("Clicca su ogni categoria per visualizzare solo i vulcani corrispondenti", width / 2, startY - padding - 8);
+  
+  // Sfondo semi-trasparente elegante per la legenda dei tipi
+  fill(25, 25, 32, 220);
+  
+  // Evidenziazione quando highlightLegends è true
+  if (highlightLegends) {
+    let pulse = sin(frameCount * 0.2) * 0.3 + 0.7; // Effetto pulsazione
+    stroke(100, 150, 255, 200 * pulse); // Bordo blu pulsante
+    strokeWeight(2);
+  } else {
+    stroke(70, 70, 80, 180);
+    strokeWeight(1);
+  }
+  rect(startX - padding, startY - padding, legendWidth + padding * 2, totalHeight, 8);
+  
+  // Titolo - stile professionale migliorato
+  textAlign(CENTER);
+  textSize(13);
+  fill(245, 245, 250);
   noStroke();
   textStyle(BOLD);
-  text("Tipi di Vulcani", width / 2, startY);
+  text("Tipi di Vulcani", width / 2, startY + 5);
+  
+  // Linea separatrice sottile sotto il titolo
+  stroke(90, 90, 100, 150);
+  strokeWeight(1);
+  line(startX - padding + 10, startY + 15, startX + legendWidth + padding - 10, startY + 15);
+  noStroke();
   
   // Disegna ogni tipo con il suo glifo
   textAlign(LEFT);
   textSize(10);
+  
+  // Salva le aree cliccabili per ogni tipo (per mousePressed)
+  window.typeLegendItems = [];
   
   for (let i = 0; i < types.length; i++) {
     let type = types[i];
@@ -171,76 +252,142 @@ function drawTypeLegend() {
     let row = floor(i / cols);
     
     let x = startX + (col * (itemWidth + itemMargin));
-    let y = startY + 25 + row * spacing;
+    let y = startY + 28 + row * spacing;
     
     // Verifica che l'elemento sia dentro la canvas
     if (x + itemWidth > width - margin) continue;
     
-    // Disegna il glifo
+    // Calcola l'area cliccabile (larghezza completa dell'elemento, altezza basata su spacing)
+    let itemHeight = spacing;
+    let itemX = x;
+    let itemY = y - 8; // Offset per centrare verticalmente
+    
+    // Salva le informazioni per il click detection
+    window.typeLegendItems.push({
+      type: type,
+      x: itemX,
+      y: itemY,
+      width: itemWidth,
+      height: itemHeight
+    });
+    
+    // Verifica se il mouse è sopra questo elemento
+    let isHovered = mouseX >= itemX && mouseX <= itemX + itemWidth &&
+                    mouseY >= itemY && mouseY <= itemY + itemHeight;
+    
+    // Verifica se questo tipo è selezionato
+    let isSelected = selectedType === type;
+    
+    // Evidenziazione per hover o selezione
+    if (isHovered || isSelected) {
+      // Sfondo evidenziato
+      push();
+      fill(50, 50, 60, isSelected ? 180 : 120);
+      noStroke();
+      rect(itemX - 5, itemY - 3, itemWidth + 10, itemHeight + 6, 4);
+      pop();
+      
+      // Cambia il cursore a mano quando si passa sopra
+      if (isHovered && !isSelected) {
+        cursor(HAND);
+      }
+    }
+    
+    // Disegna il glifo con stile più elegante
     push();
-    let colGlyph = color(180, 180, 190); // Colore chiaro per la legenda su sfondo scuro
+    // Colore più intenso se selezionato
+    let colGlyph = isSelected ? color(255, 180, 50) : color(190, 190, 200);
     fill(colGlyph);
     stroke(colGlyph);
-    strokeWeight(1);
-    drawVolcanoGlyph(x + 8, y, type);
+    strokeWeight(isSelected ? 1.5 : 1.2);
+    drawVolcanoGlyph(x + 10, y, type);
     pop();
     
-    // Testo del tipo
-    fill(220, 220, 230);
+    // Testo del tipo con migliore leggibilità
+    fill(isSelected ? color(255, 220, 120) : color(230, 230, 240));
     noStroke();
+    textStyle(isSelected ? BOLD : NORMAL);
     // Tronca il testo se è troppo lungo
     let displayType = type;
-    let maxTextWidth = itemWidth - 25;
+    let maxTextWidth = itemWidth - 30;
     if (textWidth(displayType) > maxTextWidth) {
       while (textWidth(displayType + "...") > maxTextWidth && displayType.length > 0) {
         displayType = displayType.substring(0, displayType.length - 1);
       }
       displayType += "...";
     }
-    text(displayType, x + 18, y + 4);
+    text(displayType, x + 22, y + 4);
   }
+  
+  // Il cursore verrà gestito in draw() per evitare conflitti
 }
 
 // Funzione per disegnare la legenda
 function drawLegend() {
-  let legendY = 30;
-  let legendWidth = 450;
-  let legendHeight = 30;
+  let legendY = 60; // Aumentato per più spazio dal margine alto
+  let legendWidth = 500;
+  let legendHeight = 35;
   let legendX = width / 2 - legendWidth / 2; // Centrata orizzontalmente
+  let padding = 20;
+  let containerHeight = 80;
   
-  // Testo della legenda - stile professionale
+  // Sfondo semi-trasparente elegante per la legenda
+  fill(25, 25, 32, 220);
+  
+  // Evidenziazione quando highlightLegends è true
+  if (highlightLegends) {
+    let pulse = sin(frameCount * 0.2) * 0.3 + 0.7; // Effetto pulsazione
+    stroke(100, 150, 255, 200 * pulse); // Bordo blu pulsante
+    strokeWeight(2);
+  } else {
+    stroke(70, 70, 80, 180);
+    strokeWeight(1);
+  }
+  rect(legendX - padding, legendY - padding, legendWidth + padding * 2, containerHeight, 8);
+  
+  // Titolo della legenda - stile professionale migliorato
   textAlign(CENTER);
-  textSize(15);
-  fill(240, 240, 245);
+  textSize(13);
+  fill(245, 245, 250);
   noStroke();
   textStyle(BOLD);
-  text("Più il glifo è scuro, più il vulcano è elevato", width / 2, legendY - 10);
+  text("Elevazione", width / 2, legendY - 5);
   
-  // Disegna la barra di colori graduata
+  // Sottotitolo più discreto
+  textSize(10);
+  fill(180, 180, 190);
+  textStyle(NORMAL);
+  text("Più scuro = maggiore elevazione", width / 2, legendY + 12);
+  
+  // Disegna la barra di colori graduata con bordi più definiti
   noStroke();
   for (let i = 0; i <= legendWidth; i++) {
     let normalized = i / legendWidth;
     let col = getColorByElevation(lerp(minElevation, maxElevation, normalized));
     fill(col);
-    rect(legendX + i, legendY, 1, legendHeight);
+    rect(legendX + i, legendY + 22, 1, legendHeight);
   }
   
-  // Bordo della barra - stile elegante
-  stroke(100, 100, 110);
+  // Bordo della barra - stile più elegante
+  stroke(120, 120, 130, 200);
   strokeWeight(1.5);
   noFill();
-  rect(legendX, legendY, legendWidth, legendHeight, 4);
+  rect(legendX - 0.5, legendY + 22 - 0.5, legendWidth + 1, legendHeight + 1, 3);
   
-  // Etichette dei valori minimo e massimo - testo chiaro
-  textAlign(LEFT);
-  textSize(11);
+  // Linee indicatori per i valori
+  stroke(150, 150, 160, 180);
+  strokeWeight(1);
+  line(legendX, legendY + 22 + legendHeight + 3, legendX, legendY + 22 + legendHeight + 8);
+  line(legendX + legendWidth, legendY + 22 + legendHeight + 3, legendX + legendWidth, legendY + 22 + legendHeight + 8);
+  
+  // Etichette dei valori minimo e massimo - stile più professionale
+  textAlign(CENTER);
+  textSize(10);
   fill(200, 200, 210);
   noStroke();
   textStyle(NORMAL);
-  text(nf(minElevation, 0, 0) + " m", legendX - 70, legendY + legendHeight / 2 + 5);
-  
-  textAlign(RIGHT);
-  text(nf(maxElevation, 0, 0) + " m", legendX + legendWidth + 70, legendY + legendHeight / 2 + 5);
+  text(nf(minElevation, 0, 0) + " m", legendX, legendY + 22 + legendHeight + 20);
+  text(nf(maxElevation, 0, 0) + " m", legendX + legendWidth, legendY + 22 + legendHeight + 20);
 }
 
 // Funzione per disegnare il glifo del vulcano in base al tipo
@@ -573,374 +720,142 @@ function worldGeoToScreen(lon, lat) {
   return {x: x, y: y};
 }
 
-// Funzione per disegnare una mappa del mondo realistica con solo i contorni dei continenti
+// Funzione per disegnare una mappa del mondo stilizzata minimalista (line art)
 function drawWorldMap() {
   push();
   
-  // Stile line art: solo contorni, nessun riempimento
+  // Stile line art minimalista: solo contorni sottili, nessun riempimento
   noFill();
-  stroke(60, 65, 70, 140); // Colore grigio scuro sottile ma più visibile
-  strokeWeight(1.2);
+  stroke(80, 85, 95, 120); // Colore grigio chiaro e sottile per non sovrastare i vulcani
+  strokeWeight(0.8);
   
-  // Nord America - coordinate geografiche realistiche (Alaska -> Canada -> USA -> Messico)
-  beginShape();
-  let naPoints = [
-    [-172, 66], [-170, 68], [-168, 70], [-165, 71], [-160, 71],
-    [-155, 71], [-150, 70], [-145, 69], [-140, 68], [-135, 67],
-    [-130, 66], [-125, 64], [-120, 62], [-115, 60], [-110, 58],
-    [-105, 56], [-100, 54], [-95, 52], [-90, 50], [-87, 49],
-    [-85, 48], [-83, 47], [-82, 46], [-81, 45], [-80.5, 44],
-    [-80, 42], [-79.5, 40], [-79, 38], [-78.5, 36], [-78, 34],
-    [-77.5, 32], [-77.5, 30], [-78, 28], [-79, 27], [-80, 26],
-    [-82, 25.5], [-84, 25], [-86, 24.5], [-88, 24.5], [-90, 24.5],
-    [-92, 24.5], [-94, 25], [-96, 25], [-98, 25], [-100, 25],
-    [-102, 25], [-104, 25], [-106, 25], [-108, 25.5], [-110, 26],
-    [-112, 26.5], [-114, 27], [-116, 27.5], [-118, 28], [-120, 29],
-    [-122, 30], [-124, 32], [-126, 34], [-128, 37], [-130, 40],
-    [-132, 43], [-134, 46], [-136, 49], [-138, 52], [-140, 55],
-    [-142, 58], [-144, 60], [-146, 62], [-148, 64], [-150, 65],
-    [-152, 66], [-155, 66.5], [-158, 67], [-162, 67], [-166, 67],
-    [-169, 66.5]
-  ];
-  for (let i = 0; i < naPoints.length; i++) {
-    let p = naPoints[i];
-    let pt = worldGeoToScreen(p[0], p[1]);
-    if (pt.x >= boxX - 150 && pt.x <= boxX + boxWidth + 150 && pt.y >= boxY - 150 && pt.y <= boxY + boxHeight + 150) {
-      if (i === 0) {
-        vertex(pt.x, pt.y);
-      } else {
-        curveVertex(pt.x, pt.y);
+  // Helper function per disegnare continenti con forme semplificate e curve smooth
+  function drawContinent(points) {
+    beginShape();
+    for (let i = 0; i < points.length; i++) {
+      let p = points[i];
+      let pt = worldGeoToScreen(p[0], p[1]);
+      // Permetti punti anche leggermente fuori dal box per continenti che si estendono
+      if (pt.x >= boxX - 200 && pt.x <= boxX + boxWidth + 200 && pt.y >= boxY - 200 && pt.y <= boxY + boxHeight + 200) {
+        if (i === 0 || i === points.length - 1) {
+          vertex(pt.x, pt.y);
+        } else {
+          curveVertex(pt.x, pt.y);
+        }
       }
     }
+    endShape(CLOSE);
   }
-  endShape(CLOSE);
   
-  // Sud America - forma realistica (Venezuela -> Brasile -> Argentina -> Cile)
-  beginShape();
-  let saPoints = [
-    [-72, 12], [-71, 11], [-70, 10], [-69, 8], [-68, 6],
-    [-67, 4], [-66, 2], [-65, 0], [-64.5, -2], [-64.5, -4],
-    [-65, -6], [-65.5, -8], [-66, -10], [-66.5, -12], [-67, -14],
-    [-67.5, -16], [-68, -18], [-68.5, -20], [-69, -22], [-69.5, -24],
-    [-70, -26], [-70.5, -28], [-71, -30], [-71.5, -32], [-72, -34],
-    [-72.5, -36], [-73, -38], [-73.5, -40], [-74, -42], [-74.5, -44],
-    [-75, -46], [-75.5, -48], [-76, -50], [-76.5, -52], [-77, -53.5],
-    [-77, -54.5], [-76.5, -55], [-76, -55], [-75, -54.5], [-74, -53],
-    [-73, -51], [-72, -48], [-71, -45], [-70, -42], [-69, -39],
-    [-68, -36], [-67, -33], [-66.5, -30], [-66.5, -27], [-67, -24],
-    [-67.5, -21], [-68, -18], [-68.5, -15], [-69, -12], [-69.5, -9],
-    [-70, -6], [-70.5, -3], [-71, 0], [-71.5, 3], [-72, 6],
-    [-72.5, 9]
-  ];
-  for (let i = 0; i < saPoints.length; i++) {
-    let p = saPoints[i];
-    let pt = worldGeoToScreen(p[0], p[1]);
-    if (pt.x >= boxX - 150 && pt.x <= boxX + boxWidth + 150 && pt.y >= boxY - 150 && pt.y <= boxY + boxHeight + 150) {
-      if (i === 0) {
-        vertex(pt.x, pt.y);
-      } else {
-        curveVertex(pt.x, pt.y);
+  // Helper per isole e piccole forme stilizzate
+  function drawIsland(points) {
+    beginShape();
+    for (let i = 0; i < points.length; i++) {
+      let p = points[i];
+      let pt = worldGeoToScreen(p[0], p[1]);
+      if (pt.x >= boxX - 50 && pt.x <= boxX + boxWidth + 50 && pt.y >= boxY - 50 && pt.y <= boxY + boxHeight + 50) {
+        if (i === 0 || i === points.length - 1) {
+          vertex(pt.x, pt.y);
+        } else {
+          curveVertex(pt.x, pt.y);
+        }
       }
     }
+    endShape(CLOSE);
   }
-  endShape(CLOSE);
   
-  // Europa - forma realistica (Norvegia -> Russia -> Mediterraneo -> Spagna)
-  beginShape();
-  let euPoints = [
-    [-10, 71], [-8, 71], [-5, 70.5], [-2, 70], [0, 69],
-    [3, 68], [6, 67], [9, 66], [12, 65], [15, 63],
-    [18, 61], [20, 59], [22, 57], [24, 55], [26, 53],
-    [28, 51], [29, 49], [30, 47], [31, 45], [32, 43],
-    [32.5, 41], [33, 39], [33, 37], [33, 35], [32.5, 33],
-    [32, 31], [31, 29.5], [29.5, 28.5], [27.5, 28], [25, 28],
-    [22, 28], [19, 28], [16, 28], [13, 28], [10, 28.5],
-    [7, 29], [4, 29.5], [1, 30], [-2, 30.5], [-5, 31],
-    [-7, 32], [-9, 33.5], [-10, 35], [-10.5, 37], [-10.5, 39],
-    [-10.5, 41], [-10.5, 43], [-10.5, 45], [-10.5, 47], [-10.5, 49],
-    [-10.5, 51], [-10.5, 53], [-10.5, 55], [-10.5, 57], [-10.5, 59],
-    [-10.5, 61], [-10.5, 63], [-10.5, 65], [-10.5, 67], [-10.5, 69]
-  ];
-  for (let i = 0; i < euPoints.length; i++) {
-    let p = euPoints[i];
-    let pt = worldGeoToScreen(p[0], p[1]);
-    if (pt.x >= boxX - 150 && pt.x <= boxX + boxWidth + 150 && pt.y >= boxY - 150 && pt.y <= boxY + boxHeight + 150) {
-      if (i === 0) {
-        vertex(pt.x, pt.y);
-      } else {
-        curveVertex(pt.x, pt.y);
-      }
-    }
-  }
-  endShape(CLOSE);
+  // Nord America - forma stilizzata semplificata
+  drawContinent([
+    [-170, 70], [-130, 65], [-100, 52], [-85, 45], [-80, 40],
+    [-77, 35], [-77, 30], [-80, 26], [-85, 25], [-95, 26],
+    [-105, 28], [-115, 32], [-125, 38], [-130, 45], [-135, 55],
+    [-140, 62], [-155, 66], [-170, 68]
+  ]);
   
-  // Africa - forma caratteristica (più larga a nord, stretta a sud)
-  beginShape();
-  let afPoints = [
-    [-18, 37], [-17, 37], [-15, 37.5], [-13, 38], [-11, 38],
-    [-9, 38], [-7, 38], [-5, 37.5], [-3, 37.5], [-1, 37],
-    [1, 36.5], [3, 36], [5, 35.5], [7, 35], [9, 34],
-    [11, 33], [13, 32], [15, 31], [17, 29.5], [19, 28],
-    [21, 26.5], [23, 24.5], [25, 22.5], [27, 20.5], [29, 18.5],
-    [30, 16.5], [31, 14.5], [31.5, 12.5], [32, 10.5], [32, 8.5],
-    [32, 6.5], [32, 4.5], [32, 2.5], [31.5, 0.5], [31, -1.5],
-    [30, -3.5], [28.5, -5.5], [27, -7], [25, -8], [23, -8.5],
-    [21, -9], [19, -9.5], [17, -10], [15, -10.5], [13, -11],
-    [11, -11.5], [9, -12], [7, -12], [5, -12], [3, -12],
-    [1, -12], [-1, -12], [-3, -12], [-5, -11.5], [-7, -11],
-    [-9, -10.5], [-11, -10], [-13, -9], [-15, -8], [-16.5, -6.5],
-    [-17.5, -4.5], [-18, -2.5], [-18, -0.5], [-18, 1.5], [-18, 4],
-    [-18, 7], [-18, 10], [-18, 13], [-18, 16], [-18, 19],
-    [-18, 22], [-18, 25], [-18, 28], [-18, 31], [-18, 34]
-  ];
-  for (let i = 0; i < afPoints.length; i++) {
-    let p = afPoints[i];
-    let pt = worldGeoToScreen(p[0], p[1]);
-    if (pt.x >= boxX - 100 && pt.x <= boxX + boxWidth + 100 && pt.y >= boxY - 100 && pt.y <= boxY + boxHeight + 100) {
-      if (i === 0) {
-        vertex(pt.x, pt.y);
-      } else {
-        curveVertex(pt.x, pt.y);
-      }
-    }
-  }
-  endShape(CLOSE);
+  // Sud America - forma stilizzata (stretta e allungata)
+  drawContinent([
+    [-70, 12], [-68, 5], [-66, -5], [-67, -15], [-69, -25],
+    [-72, -35], [-75, -43], [-76, -52], [-75, -54], [-73, -50],
+    [-70, -40], [-69, -28], [-69, -15], [-69, -3], [-70, 8]
+  ]);
   
-  // Asia - forma più realistica (con penisola indiana)
-  beginShape();
-  let asiaPoints = [
-    [40, 72], [45, 72], [50, 71.5], [55, 71], [60, 70.5],
-    [65, 70], [70, 69], [75, 68], [80, 67], [85, 65],
-    [90, 63], [95, 61], [100, 59], [105, 57], [110, 55],
-    [115, 53], [120, 51], [125, 49], [130, 47], [135, 45],
-    [138, 43], [140, 41], [142, 39], [144, 37], [146, 35],
-    [148, 33], [149.5, 31], [150.5, 29], [151, 27], [151, 25],
-    [151, 23], [150.5, 21], [149.5, 19], [148, 17], [146, 15],
-    [144, 13.5], [141, 12], [138, 11], [135, 10.5], [132, 10],
-    [129, 9.5], [126, 9.5], [123, 9.5], [120, 9.5], [117, 9.5],
-    [114, 9.5], [111, 10], [108, 10.5], [105, 11], [102, 11.5],
-    [99, 12.5], [96, 13.5], [93, 14.5], [90, 15.5], [87, 16.5],
-    [84, 17.5], [81, 19], [78, 20.5], [75, 22.5], [72, 25],
-    [69, 27.5], [66, 30.5], [63, 33.5], [60, 36.5], [57, 39.5],
-    [54, 42.5], [51, 45.5], [48, 48.5], [46, 51], [45, 53.5],
-    [44, 56], [43, 58.5], [42, 61], [41.5, 63.5], [41, 66],
-    [40.5, 68.5], [40, 70.5]
-  ];
-  for (let i = 0; i < asiaPoints.length; i++) {
-    let p = asiaPoints[i];
-    let pt = worldGeoToScreen(p[0], p[1]);
-    if (pt.x >= boxX - 100 && pt.x <= boxX + boxWidth + 100 && pt.y >= boxY - 100 && pt.y <= boxY + boxHeight + 100) {
-      if (i === 0) {
-        vertex(pt.x, pt.y);
-      } else {
-        curveVertex(pt.x, pt.y);
-      }
-    }
-  }
-  endShape(CLOSE);
+  // Europa - forma stilizzata
+  drawContinent([
+    [-10, 71], [-2, 70], [8, 65], [16, 60], [22, 54],
+    [28, 48], [32, 42], [33, 36], [31, 30], [25, 28],
+    [15, 29], [5, 31], [-5, 34], [-9, 40], [-10, 50],
+    [-10, 60], [-10, 68]
+  ]);
   
-  // Penisola indiana (India)
-  beginShape();
-  let indiaPoints = [
-    [68, 32], [70, 28], [72, 24], [74, 20], [76, 16],
-    [77, 12], [77, 8], [76, 8], [74, 10], [72, 12],
-    [70, 15], [68, 18], [66, 22], [65, 26], [66, 30]
-  ];
-  for (let i = 0; i < indiaPoints.length; i++) {
-    let p = indiaPoints[i];
-    let pt = worldGeoToScreen(p[0], p[1]);
-    if (pt.x >= boxX - 100 && pt.x <= boxX + boxWidth + 100 && pt.y >= boxY - 100 && pt.y <= boxY + boxHeight + 100) {
-      if (i === 0) {
-        vertex(pt.x, pt.y);
-      } else {
-        curveVertex(pt.x, pt.y);
-      }
-    }
-  }
-  endShape(CLOSE);
+  // Africa - forma stilizzata caratteristica
+  drawContinent([
+    [-17, 37], [-10, 38], [0, 36], [10, 33], [20, 29],
+    [28, 23], [33, 16], [34, 8], [33, 0], [30, -5],
+    [25, -9], [15, -11], [5, -11], [-5, -10], [-15, -7],
+    [-17, -2], [-17, 8], [-17, 18], [-17, 28]
+  ]);
   
-  // Australia - forma più realistica
-  beginShape();
-  let ausPoints = [
-    [113, -10], [115, -11], [118, -12.5], [121, -14], [124, -15.5],
-    [127, -17], [130, -18.5], [133, -20], [136, -21.5], [138, -23],
-    [140, -24.5], [142, -26], [144, -27.5], [146, -29], [147, -30.5],
-    [148, -32], [148.5, -33.5], [148.5, -35], [148, -36.5], [147, -37.5],
-    [145.5, -38], [143.5, -37.5], [141, -37], [138.5, -36], [136, -34.5],
-    [133.5, -33], [131, -31.5], [128.5, -30], [126, -28.5], [123.5, -27],
-    [121, -25.5], [118.5, -24], [116, -22.5], [114.5, -20.5], [113.5, -18],
-    [113, -15]
-  ];
-  for (let i = 0; i < ausPoints.length; i++) {
-    let p = ausPoints[i];
-    let pt = worldGeoToScreen(p[0], p[1]);
-    if (pt.x >= boxX - 100 && pt.x <= boxX + boxWidth + 100 && pt.y >= boxY - 100 && pt.y <= boxY + boxHeight + 100) {
-      if (i === 0) {
-        vertex(pt.x, pt.y);
-      } else {
-        curveVertex(pt.x, pt.y);
-      }
-    }
-  }
-  endShape(CLOSE);
+  // Asia - forma stilizzata
+  drawContinent([
+    [40, 73], [60, 71], [80, 67], [100, 61], [120, 53],
+    [140, 43], [150, 33], [151, 23], [148, 15], [140, 11],
+    [130, 10], [115, 12], [100, 16], [85, 23], [70, 32],
+    [55, 42], [45, 52], [41, 62], [40, 70]
+  ]);
   
-  // Groenlandia - forma più realistica
-  beginShape();
-  let grPoints = [
-    [-73, 60], [-70, 61], [-67, 62], [-64, 63],
-    [-60, 63], [-56, 64], [-52, 64], [-48, 64],
-    [-44, 65], [-40, 65], [-36, 64], [-32, 64],
-    [-28, 63], [-26, 62], [-25, 61], [-25, 60],
-    [-26, 59], [-28, 58], [-32, 57], [-36, 57],
-    [-40, 56], [-44, 56], [-48, 56], [-52, 56],
-    [-56, 57], [-60, 57], [-64, 58], [-68, 59]
-  ];
-  for (let i = 0; i < grPoints.length; i++) {
-    let p = grPoints[i];
-    let pt = worldGeoToScreen(p[0], p[1]);
-    if (pt.x >= boxX - 100 && pt.x <= boxX + boxWidth + 100 && pt.y >= boxY - 100 && pt.y <= boxY + boxHeight + 100) {
-      if (i === 0) {
-        vertex(pt.x, pt.y);
-      } else {
-        curveVertex(pt.x, pt.y);
-      }
-    }
-  }
-  endShape(CLOSE);
+  // Penisola indiana (India) - stilizzata
+  drawIsland([
+    [68, 34], [73, 23], [77, 11], [76, 8], [72, 12],
+    [69, 18], [67, 26], [67, 31]
+  ]);
   
-  // Giappone - forma più realistica
-  beginShape();
-  let jpPoints = [
-    [129, 32], [130, 33], [131, 34], [132, 35],
-    [133, 35], [134, 36], [135, 36], [136, 37],
-    [137, 37], [138, 36], [139, 35], [140, 34],
-    [141, 33], [141, 32], [141, 31], [140, 30],
-    [139, 29], [138, 28], [137, 28], [136, 27],
-    [135, 27], [134, 27], [133, 28], [132, 29],
-    [131, 30], [130, 31]
-  ];
-  for (let i = 0; i < jpPoints.length; i++) {
-    let p = jpPoints[i];
-    let pt = worldGeoToScreen(p[0], p[1]);
-    if (pt.x >= boxX - 100 && pt.x <= boxX + boxWidth + 100 && pt.y >= boxY - 100 && pt.y <= boxY + boxHeight + 100) {
-      if (i === 0) {
-        vertex(pt.x, pt.y);
-      } else {
-        curveVertex(pt.x, pt.y);
-      }
-    }
-  }
-  endShape(CLOSE);
+  // Australia - forma stilizzata
+  drawContinent([
+    [113, -12], [125, -18], [135, -25], [143, -32], [143, -37],
+    [140, -38], [132, -33], [125, -27], [118, -20], [114, -14]
+  ]);
   
-  // Italia - forma dettagliata (stivale)
-  beginShape();
-  let itPoints = [
-    [6, 44], [7, 44], [8, 44], [9, 43],
-    [10, 43], [11, 42], [12, 42], [12.5, 41.5],
-    [13, 41], [13, 40.5], [13, 40], [12.5, 39.5],
-    [12, 39], [11, 38.5], [10, 38], [9, 37.5],
-    [8, 37], [7, 37], [6, 37], [5.5, 37.5],
-    [5, 38], [5, 39], [5, 40], [5, 41],
-    [5, 42], [5.5, 43]
-  ];
-  for (let i = 0; i < itPoints.length; i++) {
-    let p = itPoints[i];
-    let pt = worldGeoToScreen(p[0], p[1]);
-    if (pt.x >= boxX - 100 && pt.x <= boxX + boxWidth + 100 && pt.y >= boxY - 100 && pt.y <= boxY + boxHeight + 100) {
-      if (i === 0) {
-        vertex(pt.x, pt.y);
-      } else {
-        curveVertex(pt.x, pt.y);
-      }
-    }
-  }
-  endShape(CLOSE);
+  // Groenlandia - stilizzata
+  drawContinent([
+    [-73, 60], [-60, 64], [-40, 64.5], [-28, 63], [-25, 60],
+    [-28, 58], [-40, 57.5], [-60, 58.5], [-70, 60]
+  ]);
   
-  // Regno Unito - forma più realistica
-  beginShape();
-  let ukPoints = [
-    [-8, 51], [-7.5, 51], [-7, 51.5], [-6, 52],
-    [-5, 52], [-4, 52.5], [-3, 53], [-2, 53],
-    [-1.5, 53], [-1, 53], [-1, 53.5], [-1.5, 54],
-    [-2, 54.5], [-3, 55], [-4, 55], [-5, 55],
-    [-6, 54.5], [-7, 54], [-8, 53.5], [-8.5, 53],
-    [-9, 52.5], [-9, 52], [-8.5, 51.5]
-  ];
-  for (let i = 0; i < ukPoints.length; i++) {
-    let p = ukPoints[i];
-    let pt = worldGeoToScreen(p[0], p[1]);
-    if (pt.x >= boxX - 100 && pt.x <= boxX + boxWidth + 100 && pt.y >= boxY - 100 && pt.y <= boxY + boxHeight + 100) {
-      if (i === 0) {
-        vertex(pt.x, pt.y);
-      } else {
-        curveVertex(pt.x, pt.y);
-      }
-    }
-  }
-  endShape(CLOSE);
+  // Giappone - stilizzato
+  drawIsland([
+    [129, 32], [133, 36], [137, 36], [141, 33], [141, 30],
+    [138, 28], [134, 27], [130, 29]
+  ]);
   
-  // Penisola iberica
-  beginShape();
-  let ibPoints = [
-    [-10, 40], [-9, 40], [-8, 40], [-7, 40],
-    [-6, 41], [-6, 42], [-7, 43], [-8, 44],
-    [-9, 44.5], [-10, 44], [-10, 43], [-10, 42]
-  ];
-  for (let i = 0; i < ibPoints.length; i++) {
-    let p = ibPoints[i];
-    let pt = worldGeoToScreen(p[0], p[1]);
-    if (pt.x >= boxX - 100 && pt.x <= boxX + boxWidth + 100 && pt.y >= boxY - 100 && pt.y <= boxY + boxHeight + 100) {
-      if (i === 0) {
-        vertex(pt.x, pt.y);
-      } else {
-        curveVertex(pt.x, pt.y);
-      }
-    }
-  }
-  endShape(CLOSE);
+  // Italia - stilizzata (stivale)
+  drawIsland([
+    [6, 44], [9, 43], [12, 41], [13, 40], [12, 39],
+    [8, 37], [6, 37], [5, 39], [5, 42]
+  ]);
   
-  // Indonesia/Malesia
-  beginShape();
-  let idPoints = [
-    [95, 6], [98, 5], [102, 4], [105, 3],
-    [108, 2], [111, 1], [114, 0], [116, -1],
-    [118, -2], [119, -3], [119, -5], [118, -6],
-    [116, -7], [114, -8], [111, -8], [108, -7],
-    [105, -7], [102, -6], [99, -5], [96, -4],
-    [95, -2], [95, 0], [95, 3]
-  ];
-  for (let i = 0; i < idPoints.length; i++) {
-    let p = idPoints[i];
-    let pt = worldGeoToScreen(p[0], p[1]);
-    if (pt.x >= boxX - 100 && pt.x <= boxX + boxWidth + 100 && pt.y >= boxY - 100 && pt.y <= boxY + boxHeight + 100) {
-      if (i === 0) {
-        vertex(pt.x, pt.y);
-      } else {
-        curveVertex(pt.x, pt.y);
-      }
-    }
-  }
-  endShape(CLOSE);
+  // Regno Unito - stilizzato
+  drawIsland([
+    [-8, 51], [-6, 52], [-2, 53], [-1, 54], [-3, 55],
+    [-6, 54.5], [-8, 53], [-9, 52]
+  ]);
   
-  // Madagascar
-  beginShape();
-  let mgPoints = [
-    [46, -12], [47, -12], [48, -13], [48, -14],
-    [48, -16], [47, -17], [46, -18], [45, -18],
-    [44, -17], [44, -15], [44, -13], [45, -12]
-  ];
-  for (let i = 0; i < mgPoints.length; i++) {
-    let p = mgPoints[i];
-    let pt = worldGeoToScreen(p[0], p[1]);
-    if (pt.x >= boxX - 100 && pt.x <= boxX + boxWidth + 100 && pt.y >= boxY - 100 && pt.y <= boxY + boxHeight + 100) {
-      if (i === 0) {
-        vertex(pt.x, pt.y);
-      } else {
-        curveVertex(pt.x, pt.y);
-      }
-    }
-  }
-  endShape(CLOSE);
+  // Penisola iberica - stilizzata
+  drawIsland([
+    [-10, 40], [-7, 40], [-6, 42], [-7, 43], [-9, 44],
+    [-10, 42]
+  ]);
+  
+  // Indonesia/Malesia - stilizzata
+  drawIsland([
+    [95, 6], [105, 3], [115, 0], [119, -3], [118, -6],
+    [111, -8], [102, -6], [96, -4], [95, 0]
+  ]);
+  
+  // Madagascar - stilizzata
+  drawIsland([
+    [46, -12], [48, -14], [48, -16], [47, -18], [45, -18],
+    [44, -16], [44, -13], [45, -12]
+  ]);
   
   pop();
 }
@@ -971,6 +886,19 @@ function draw() {
   // Sfondo scuro elegante
   background(15, 15, 20);
   
+  // Istruzione per l'interazione
+  textAlign(CENTER);
+  textSize(11);
+  fill(180, 180, 190);
+  noStroke();
+  textStyle(NORMAL);
+  let instructionText = "Clicca su un vulcano per visualizzarne le specifiche";
+  if (selectedType) {
+    instructionText = "Filtro attivo: " + selectedType + " | Clicca di nuovo sulla legenda per rimuovere il filtro";
+    fill(255, 180, 50); // Colore arancione per indicare il filtro attivo
+  }
+  text(instructionText, width / 2, 35);
+  
   // Disegna la legenda dell'elevazione in alto
   drawLegend();
   
@@ -995,12 +923,14 @@ function draw() {
   strokeWeight(1);
   rect(boxX + 1, boxY + 1, boxWidth - 2, boxHeight - 2, 6);
   
-  // Disegna il planisfero di sfondo all'interno del riquadro
-  drawWorldMap();
-  
   // Disegna i glifi per ogni vulcano alle coordinate geografiche (lat/lon mappate)
   // con colori basati sull'elevazione
   for (let volcano of volcanoes) {
+    // Filtra in base al tipo selezionato nella legenda
+    if (selectedType !== null && volcano.type !== selectedType) {
+      continue; // Salta questo vulcano se non corrisponde al tipo selezionato
+    }
+    
     // Verifica che il vulcano sia dentro il riquadro
     if (volcano.x >= boxX && volcano.x <= boxX + boxWidth &&
         volcano.y >= boxY && volcano.y <= boxY + boxHeight) {
@@ -1032,10 +962,90 @@ function draw() {
   if (selectedVolcano) {
     drawVolcanoInfo(selectedVolcano);
   }
+  
+  // Disegna il footer
+  drawFooter();
+  
+  // Gestisce l'evidenziazione delle legende
+  if (highlightLegends) {
+    highlightTimer--;
+    if (highlightTimer <= 0) {
+      highlightLegends = false;
+    }
+  }
+}
+
+// Funzione per disegnare il footer
+function drawFooter() {
+  let footerHeight = 40;
+  let footerY = height - footerHeight;
+  
+  // Sfondo del footer
+  fill(25, 25, 32, 240);
+  stroke(70, 70, 80, 200);
+  strokeWeight(1);
+  rect(0, footerY, width, footerHeight);
+  
+  // Linea superiore del footer
+  stroke(90, 90, 100, 150);
+  strokeWeight(1);
+  line(0, footerY, width, footerY);
+  noStroke();
+  
+  // Testo del footer (cliccabile)
+  textAlign(CENTER);
+  textSize(12);
+  fill(200, 200, 210);
+  textStyle(NORMAL);
+  
+  // Verifica se il mouse è sopra il footer per cambiare il colore
+  if (mouseY >= footerY && mouseY <= height) {
+    fill(240, 240, 250);
+    cursor(HAND);
+  }
+  
+  text("Torna alle legende", width / 2, footerY + footerHeight / 2 + 4);
+  
+  // Icona freccia o indicatore
+  fill(180, 180, 190);
+  triangle(width / 2 - 60, footerY + footerHeight / 2 - 5, 
+           width / 2 - 60, footerY + footerHeight / 2 + 5,
+           width / 2 - 75, footerY + footerHeight / 2);
 }
 
 // Funzione per rilevare il click su un vulcano
 function mousePressed() {
+  let footerHeight = 40;
+  let footerY = height - footerHeight;
+  
+  // Controlla se il click è su un elemento della legenda dei tipi
+  if (window.typeLegendItems) {
+    for (let item of window.typeLegendItems) {
+      if (mouseX >= item.x && mouseX <= item.x + item.width &&
+          mouseY >= item.y && mouseY <= item.y + item.height) {
+        // Se si clicca sullo stesso tipo, deseleziona (mostra tutti)
+        if (selectedType === item.type) {
+          selectedType = null;
+        } else {
+          // Altrimenti seleziona il nuovo tipo
+          selectedType = item.type;
+        }
+        // Deseleziona il vulcano selezionato quando si cambia filtro
+        selectedVolcano = null;
+        return; // Non processare altri click
+      }
+    }
+  }
+  
+  // Controlla se il click è sul footer
+  if (mouseY >= footerY && mouseY <= height) {
+    // Scrolla alla parte superiore della pagina e evidenzia le legende
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    highlightLegends = true;
+    highlightTimer = 120; // Evidenzia per 120 frame (circa 2 secondi a 60fps)
+    return; // Non processare altri click
+  }
+  
   selectedVolcano = null;
   
   // Controlla se il click è dentro il riquadro
@@ -1069,7 +1079,7 @@ function drawVolcanoInfo(volcano) {
   let infoHeight = 180; // Aumentata per le ultime 3 colonne
   let padding = 12;
   let margin = 15;
-  let offset = 20; // Offset dalla posizione del vulcano
+  let offset = 0; // Offset dalla posizione del vulcano
   
   // Calcola la posizione accanto al vulcano
   // Prova prima a destra
